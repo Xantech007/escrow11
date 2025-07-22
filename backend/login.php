@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $success = "Login successful! Redirecting...";
 
                 // Redirect to the dashboard
-                header("Location: ../frontend/index.php");
+                header("Location: ../frontend/index.html");
                 exit();
             } else {
                 $errors[] = "Invalid email or password";
