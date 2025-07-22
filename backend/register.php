@@ -1,70 +1,107 @@
 <?php
-// Enable error reporting for debugging (disable in production)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// Start session
+session_start();
 
-// Database configuration
-$host = 'localhost';
-$dbname = 'escrow_p2p';
-$username = 'your_db_username'; // Replace with your MySQL username
-$password = 'your_db_password'; // Replace with your MySQL password
+// Include database connection
+require_once '../src/conn.php';
 
-// Response array
-$response = ['success' => false, 'message' => ''];
+// Initialize variables for error and success messages
+$errors = [];
+$success = '';
 
-try {
-    // Create PDO connection
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+// Check if form is submitted
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Sanitize and validate input data
+    $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_STRING);
+    $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
+    $phone = filter_input(INPUT_POST, 'phone', FILTER_SANITIZE_STRING);
+    $password = $_POST['password']; // Don't sanitize password to preserve special characters
+    $confirm_password = $_POST['confirm_password'];
 
-    // Check if form is submitted
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // Sanitize and validate inputs
-        $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_STRING);
-        $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
-        $phone = filter_input(INPUT_POST, 'phone', FILTER_SANITIZE_STRING);
-        $password = $_POST['password']; // Password is not sanitized to preserve its integrity
-        $confirm_password = $_POST['confirm_password'];
-
-        // Validation checks
-        if (empty($name) || empty($email) || empty($phone) || empty($password) || empty($confirm_password)) {
-            $response['message'] = 'All fields are required.';
-        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $response['message'] = 'Invalid email format.';
-        } elseif ($password !== $confirm_password) {
-            $response['message'] = 'Passwords do not match.';
-        } elseif (strlen($password) < 8) {
-            $response['message'] = 'Password must be at least 8 characters long.';
-        } else {
-            // Check for duplicate email
-            $stmt = $pdo->prepare('SELECT COUNT(*) FROM users WHERE email = ?');
-            $stmt->execute([$email]);
-            if ($stmt->fetchColumn() > 0) {
-                $response['message'] = 'Email is already registered.';
-            } else {
-                // Hash the password
-                $hashed_password = password_hash($password, PASSWORD_BCRYPT);
-
-                // Insert user into the database
-                $stmt = $pdo->prepare('INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)');
-                $stmt->execute([$name, $email, $phone, $hashed_password]);
-
-                $response['success'] = true;
-                $response['message'] = 'Registration successful! You can now <a href="login.html">log in</a>.';
-            }
-        }
-    } else {
-        $response['message'] = 'Invalid request method.';
+    // Validation checks
+    if (empty($name)) {
+        $errors[] = "Name is required";
     }
-} catch (PDOException $e) {
-    $response['message'] = 'Database error: ' . $e->getMessage();
-} catch (Exception $e) {
-    $response['message'] = 'An error occurred: ' . $e->getMessage();
-}
 
-// Return JSON response
-header('Content-Type: application/json');
-echo json_encode($response);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Valid email is required";
+    }
+
+    if (empty($phone)) {
+        $errors[] = "Phone number is required";
+    }
+
+    if (empty($password)) {
+        $errors[] = "Password is required";
+    } elseif (strlen($password) < 8) {
+        $errors[] = "Password must be at least 8 characters long";
+    }
+
+    if ($password !== $confirm_password) {
+        $errors[] = "Passwords do not match";
+    }
+
+    // Check if email already exists
+    try {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        if ($stmt->fetchColumn() > 0) {
+            $errors[] = "Email already registered";
+        }
+    } catch (PDOException $e) {
+        $errors[] = "Database error: " . $e->getMessage();
+    }
+
+    // If no errors, proceed with registration
+    if (empty($errors)) {
+        try {
+            // Hash the password
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+
+            // Prepare and execute the insert query
+            $stmt = $pdo->prepare("INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$name, $email, $phone, $hashed_password]);
+
+            // Set success message
+            $success = "Registration successful! Please login.";
+            
+            // Optionally, redirect to login page
+            // header("Location: ../login.html");
+            // exit();
+        } catch (PDOException $e) {
+            $errors[] = "Registration failed: " . $e->getMessage();
+        }
+    }
+}
 ?>
+
+<?php if (!empty($errors) || !empty($success)): ?>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Registration Result</title>
+    <link href="../assets/css/argon-dashboardf27d.css?v=2.0.4" rel="stylesheet" />
+</head>
+<body>
+    <div class="container mt-5">
+        <?php if (!empty($errors)): ?>
+            <div class="alert alert-danger">
+                <ul>
+                    <?php foreach ($errors as $error): ?>
+                        <li><?php echo htmlspecialchars($error); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <a href="../register.html" class="btn btn-primary">Back to Registration</a>
+        <?php endif; ?>
+
+        <?php if (!empty($success)): ?>
+            <div class="alert alert-success">
+                <?php echo htmlspecialchars($success); ?>
+            </div>
+            <a href="../login.html" class="btn btn-primary">Proceed to Login</a>
+        <?php endif; ?>
+    </div>
+</body>
+</html>
+<?php endif; ?>
