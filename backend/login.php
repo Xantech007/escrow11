@@ -50,9 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Set success message
                 $success = "Login successful! Redirecting...";
-                
-                // Redirect to a dashboard or home page
-                header("Location: ../dashboard.html"); // Replace with actual dashboard page
+
+                // Redirect to the dashboard
+                header("Location: ../frontend/index.php");
                 exit();
             } else {
                 $errors[] = "Invalid email or password";
@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php endforeach; ?>
                 </ul>
             </div>
-            <a href="../login.html" class="btn btn-primary">Back to Login</a>
+            <a href="../frontend/login.html" class="btn btn-primary">Back to Login</a>
         <?php endif; ?>
 
         <?php if (!empty($success)): ?>
